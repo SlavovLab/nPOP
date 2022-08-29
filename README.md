@@ -48,7 +48,7 @@ The manuscript for this tool is published at the Journal of Proteome Research: [
 -->
 The manuscript is freely available on bioRxiv: [Leduc et al., 2022 (version 4)](https://doi.org/10.1101/2021.04.24.441211). <!-- The peer reviewed version is available at *Nature Biotechnology*: [Derks et al., 2022](https://doi.org/10.1038/s41587-022-01389-w) -->
 
-For more information, contact [Slavov Laboratory](https://slavovlab.net) or directly [Prof. Nikolai Slavov](https://coe.northeastern.edu/people/slavov-nikolai/)
+For more information, contact [Slavov Laboratory](https://slavovlab.net).
 
 ### License
 
@@ -73,4 +73,4 @@ Scripts for the figures in the DART-ID manuscript are available in a separate Gi
 ## Help!
 
 For any bugs, questions, or feature requests,
-please use the [GitHub issue system](https://github.com/SlavovLab/plexDIA/issues) to contact the developers.
+please use the [GitHub issue system](https://github.com/SlavovLab/nPOP/issues) to contact the developers.
