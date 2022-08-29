@@ -1,0 +1,441 @@
+---
+title: "Melanoma_SubPOP"
+output: html_notebook
+---
+
+Loading data
+```{r Load Data}
+
+source("/Users/andrewleduc/Desktop/nPOP_Paper/code/functions_parameters.R")
+
+#t7_Monocytes <- read.csv('../dat/Proccessed_data/t7_Monocytes.csv',row.names = 1)
+#t7_Melanomas <- read.csv('../dat/Proccessed_data/t7_Melanomas.csv',row.names = 1)
+
+# Databases for Protein Set Enrichment Analysis
+GO_db <- read.delim("../dat/raw_data/GOA_db.txt", sep = " ")
+
+# Data base for converting Gene Names to Proteins
+convert <- read.delim('../dat/raw_data/human_uniprot_db.txt')
+convert$Gene.names <- as.character(convert$Gene.names)
+convert$Gene.names2 <- gsub(' .*','',convert$Gene.names)
+
+#Load Meta data for updating
+meta <- read.csv('../dat/Proccessed_data/pSCoPE/meta.csv',row.names = 1)
+meta_mel <- meta %>% filter(celltype == 'm')
+meta_mon <- meta %>% filter(celltype == 'u')
+meta_mel_l <- meta %>% filter(sub =='C1')
+meta_mel_s <- meta %>% filter(sub =='C2')
+
+
+t7 <- read.csv('../dat/Proccessed_data/pSCoPE/t7.csv',row.names = 1)
+t7_Monocytes <- t7 %>% dplyr::select(intersect(colnames(t7),meta_mon$id))
+t7_Melanomas <- t7 %>% dplyr::select(intersect(colnames(t7),meta_mel$id))
+t7_Melanomas_small <-t7 %>% dplyr::select(intersect(colnames(t7),meta_mel_s$id))
+t7_Melanomas_large <-t7 %>% dplyr::select(intersect(colnames(t7),meta_mel_l$id))
+
+#t4b <- read.csv('../dat/Proccessed_data/t4b.csv',row.names = 1)
+```
+
+Here we are Computing PCA in the space of the Melanoma cells where we have noticed 2 populations. We overlay markers from Emert et al. (2021) paper on the same melanoma cells that are predictive of either drug resistance or drug suceptibility. We compute p values and notice strong allignment with our two observed clusters
+
+```{r  Sub population Analysis of Melanoma Cells Drug Resistance}
+#Load markers for Drug resistance from Emert et al. (2021)
+
+
+raj <- read.csv('../dat/raw_data/Melanoma_diff_exp_raj.csv')
+raj <- raj %>% left_join(convert,by = c('gene_name' = 'Gene.names2'))
+raj <- raj %>% dplyr::filter(padj < .1)
+
+Drug_resist <- raj %>% dplyr::filter(log2FoldChange >1.5)
+Main_pop <- raj %>% dplyr::filter(log2FoldChange < 0)
+
+
+Drug_resist <- Drug_resist %>% filter(Entry %in% rownames(t7))
+#PCA
+
+mat.sc.imp <- as.matrix(t7_Melanomas)
+mat.sc.imp <- cr_norm_log(mat.sc.imp)
+
+X.m <-  mat.sc.imp
+pca.imp.cor <- cor(X.m, use = 'pairwise.complete.obs',method = c('pearson'))
+
+# PCA
+sc.pca<-eigen(pca.imp.cor)
+scx<-as.data.frame(sc.pca$vectors)
+colnames(scx)<-paste0("PC",1:ncol(scx))
+scx$cells<-colnames(pca.imp.cor)
+
+# Percent of variance explained by each principle component
+pca_var <- sc.pca$values
+percent_var<- pca_var/sum(pca_var)*100
+plot(1:length(percent_var), percent_var, xlab="PC", ylab="% of variance explained")
+
+# Map meta data
+pca.melt <- melt(scx); colnames(pca.melt)<-c("id","pc","value")
+ev.melt.uniqueID_lim<-meta[,c(4:6)]
+
+pca.melt <- left_join(pca.melt,ev.melt.uniqueID_lim,by= 'id')
+pca.display <- reshape2::dcast(pca.melt, id + celltype + channel ~ pc, value.var = "value", fill=NA)
+
+PCx<-"PC1"
+PCy<-"PC2"
+
+
+# Color PCA by markers of Resistance
+
+#t7_pif_filt_mel <-as.data.frame(t7_pif_filt) %>%dplyr::select(colnames(t7_Melanomas))
+Res  <- t7_Melanomas %>% dplyr::filter(rownames(t7_Melanomas) %in% Drug_resist$Entry)
+Main <- t7_Melanomas %>% dplyr::filter(rownames(t7_Melanomas) %in% Main_pop$Entry)
+
+
+pca.display$Resistance_Markers <- colMedians(as.matrix(Res),na.rm = T)
+pca.display$Resistance_Markers[pca.display$Resistance_Markers > 1] <- 1
+pca.display$Resistance_Markers[pca.display$Resistance_Markers < -1] <- -1
+pca.display$Main_Population_Markers <- colMedians(as.matrix(Main),na.rm = T)
+pca.display$Main_Population_Markers[pca.display$Main_Population_Markers > 1] <- 1
+pca.display$Main_Population_Markers[pca.display$Main_Population_Markers < -1] <- -1
+
+sp4 <- ggscatter(pca.display, color = 'Resistance_Markers' ,x =PCx, y = PCy, size = 5, alpha=0.5) +
+  xlab("") +
+  ylab("") +
+  font("ylab",size=0) +
+  font("xlab",size=0) +
+  font("xy.text", size=0)+
+  rremove("legend") + 
+  ggtitle('Resistance Markers') + 
+  scale_color_gradient2(midpoint = 0, low = "blue", mid = "white",
+                          high = "red",name = '') + theme(plot.title = element_text(size = 20))
+
+bp_m <-ggscatter(pca.display, color = 'Main_Population_Markers' ,x =PCx, y = PCy, size = 8, alpha=0.5) +
+  xlab(paste0(PCx,"  (", round(percent_var[1],0),"%)")) +
+  ylab(paste0(PCy,"  (", round(percent_var[2],0),"%)")) +
+  font("ylab",size=30) +
+  font("xlab",size=30) +
+  font("xy.text", size=20)+
+  #rremove("legend") +
+  ggtitle('Main Population Markers') + 
+  theme(legend.key.height =  unit(.35, "cm"),legend.key.width  =  unit(3, "cm")) + 
+  scale_color_gradient2(midpoint = 0, low = "blue", mid = "white",
+                          high = "red",name = '') + theme(plot.title = element_text(size = 25))
+
+
+
+
+#Get Identifiers for subpopulations based off the GSEA
+Melanoma_Small <- pca.display %>% dplyr::filter(PC1 < -.07)
+Melanoma_Large <- pca.display %>% dplyr::filter(PC1 > -.07)
+
+t7_Melanomas_Small <- t7_Melanomas %>% dplyr::select(Melanoma_Small$id)
+t7_Melanomas_Large <- t7_Melanomas %>% dplyr::select(Melanoma_Large$id)
+
+#meta$sub <- NA
+#meta$sub[meta$id %in% colnames(t7_Melanomas_Large)] <- 'C1'
+#meta$sub[meta$id %in% colnames(t7_Melanomas_Small)] <- 'C2'
+
+#write.csv(t7_Melanomas_Small,'../dat/Proccessed_data/t7_Melanomas_Small.csv',row.names = T)
+#write.csv(t7_Melanomas_Large,'../dat/Proccessed_data/t7_Melanomas_Large.csv',row.names = T)
+#write.csv(meta,'../dat/Proccessed_data/meta.csv',row.names = T)
+
+#calc p val for marker clusters
+Res_small  <- t7_Melanomas_Small %>% filter(rownames(t7_Melanomas_Small) %in% Drug_resist$Entry)
+Res_large  <- t7_Melanomas_Large %>% filter(rownames(t7_Melanomas_Large) %in% Drug_resist$Entry)
+Res_small <- melt(Res_small)
+Res_small$variable <- 'Small'
+Res_large<- melt(Res_large)
+Res_large$variable <- 'Large'
+res_p <- rbind(Res_large,Res_small)
+res_p <- res_p %>% filter(is.na(value)==F)
+kruskal.test(value ~ variable, data = res_p)
+#3.864e-05
+
+Main_small <- t7_Melanomas_Small %>% filter(rownames(t7_Melanomas_Small) %in% Main_pop$Entry)
+Main_large <- t7_Melanomas_Large %>% filter(rownames(t7_Melanomas_Large) %in% Main_pop$Entry)
+Main_small<- melt(Main_small)
+Main_small$variable <- 'Small'
+Main_large <- melt(Main_large)
+Main_large$variable <- 'Large'
+main_p <- rbind(Main_large,Main_small)
+main_p <- main_p %>% filter(is.na(value)==F)
+kruskal.test(value ~ variable, data = main_p)
+kruskal.test(value ~ variable, data = res_p)
+bp_m
+#2.2e-16
+
+
+
+```
+Here we analyze cluster further and and compute protein set enrichment analysis between the two cluster. We identify many significant gene sets related to cell division.
+```{r  Sub population Analysis of Melanoma Cells GSEA}
+## GSEA on Sub population
+
+Melanoma_GSEA <- t7_Melanomas
+Melanoma_GSEA$prot <- rownames(Melanoma_GSEA)
+Melanoma_GSEA <- melt(Melanoma_GSEA,id.vars = 'prot')
+Melanoma_GSEA$Condition <- NA
+Melanoma_GSEA$Condition[Melanoma_GSEA$variable %in% Melanoma_Small$id] <- 'Small'
+Melanoma_GSEA$Condition[Melanoma_GSEA$variable %in% Melanoma_Large$id] <- 'Large'
+Melanoma_GSEA <- Melanoma_GSEA %>% filter(is.na(value)==F)
+#Melanoma_GSEA$variable <- NULL
+
+colnames(Melanoma_GSEA)<- c('Protein','SampID','Intensity','Condition')
+
+
+GSEA_out <- Population_GSEA(Melanoma_GSEA,GO_db,2)
+GSEA_out <- GSEA_out %>% filter(is.na(pVal)==F)
+
+# Multiple hypothesis testing correction
+GSEA_out$qVal <- p.adjust(GSEA_out$pVal, method = "BH")
+GSEA_out <- GSEA_out %>% filter(qVal < .001)
+GSEA_out <- GSEA_out %>% filter(numberOfMatches > 2)
+GSEA_out$dif <- GSEA_out$Cond1med_int - GSEA_out$Cond2med_int
+
+
+
+
+#write.csv(GSEA_out,'../dat/Output_tables/Melanoma_SubPop_PSEA.csv')
+
+GO_db_set1 <- GO_db %>% filter(GO_term_name == 'protein secretion' )
+Gene_set1 <- t7_Melanomas %>% filter(rownames(t7_Melanomas) %in% GO_db_set1$Uniprot)
+pca.display$p53 <- colMedians(as.matrix(Gene_set1),na.rm = T)
+pca.display$p53[pca.display$p53 > 1] <- 1
+pca.display$p53[pca.display$p53 < -1] <- -1
+sp1 <-ggscatter(pca.display, color = 'p53' ,x =PCx, y = PCy, size = 5, alpha=0.5) +
+  xlab("") +
+  ylab("") +
+  font("ylab",size=0) +
+  font("xlab",size=0) +
+  font("xy.text", size=0)+
+  rremove("legend") + 
+  ggtitle('protein secretion') + theme(plot.title = element_text(size = 14)) +
+  scale_color_gradient2(midpoint = .2, low = "blue", mid = "white",
+                          high = "red",name = '')+ theme(plot.title = element_text(size = 20))
+
+GO_db_set1 <- GO_db %>% filter(GO_term_name == 'cellular senescence' )
+Gene_set1 <- t7_Melanomas %>% filter(rownames(t7_Melanomas) %in% GO_db_set1$Uniprot)
+pca.display$cell_sens <- colMedians(as.matrix(Gene_set1),na.rm = T)
+pca.display$cell_sens[pca.display$cell_sens > 1] <- 1
+pca.display$cell_sens[pca.display$cell_sens < -1] <- -1
+sp2 <-ggscatter(pca.display, color = 'cell_sens' ,x =PCx, y = PCy, size = 5, alpha=0.5) +
+  xlab("") +
+  ylab("") +
+  font("ylab",size=0) +
+  font("xlab",size=0) +
+  font("xy.text", size=0)+
+  rremove("legend") +
+  ggtitle('cellular senesence') +
+  scale_color_gradient2(midpoint = .0, low = "blue", mid = "white",
+                          high = "red",name = '') + theme(plot.title = element_text(size = 20))
+
+GO_db_set1 <- GO_db %>% filter(GO_term_name == 'positive regulation of cell cycle arrest')
+Gene_set1 <- t7_Melanomas %>% filter(rownames(t7_Melanomas) %in% GO_db_set1$Uniprot)
+pca.display$resp_c <- colMedians(as.matrix(Gene_set1),na.rm = T)
+pca.display$resp_c[pca.display$resp_c > 1] <- 1
+pca.display$resp_c[pca.display$resp_c < -1] <- -1
+sp3 <-ggscatter(pca.display, color = 'resp_c' ,x =PCx, y = PCy, size = 5, alpha=0.5) +
+  xlab("") +
+  ylab("") +
+  font("ylab",size=0) +
+  font("xlab",size=0) +
+  font("xy.text", size=0)+
+  rremove("legend") + 
+  ggtitle('positive regulation of cell cycle arrest') +
+  scale_color_gradient2(midpoint = .2, low = "blue", mid = "white",
+                          high = "red",name = '') + theme(plot.title = element_text(size = 20))
+
+
+
+GO_db_set1 <- GO_db %>% filter(GO_term_name == 'G2/M transition of mitotic cell cycle' )
+Gene_set1 <- t7_Melanomas %>% filter(rownames(t7_Melanomas) %in% GO_db_set1$Uniprot)
+pca.display$G2 <- colMedians(as.matrix(Gene_set1),na.rm = T)
+pca.display$G2[pca.display$G2 > 1] <- 1
+pca.display$G2[pca.display$G2 < -1] <- -1
+bp1 <-ggscatter(pca.display, color = 'G2' ,x =PCx, y = PCy, size = 5, alpha=0.5) +
+  xlab("") +
+  ylab("") +
+  font("ylab",size=0) +
+  font("xlab",size=0) +
+  font("xy.text", size=0)+
+  rremove("legend") + 
+  ggtitle('G2/M transition of mitotic cell cycle') + 
+  scale_color_gradient2(midpoint = .0, low = "blue", mid = "white",
+                          high = "red",name = '') + theme(plot.title = element_text(size = 20))
+
+GO_db_set1 <- GO_db %>% filter(GO_term_name == 'microtubule-based process' )
+Gene_set1 <- t7_Melanomas %>% filter(rownames(t7_Melanomas) %in% GO_db_set1$Uniprot)
+pca.display$tub <- colMedians(as.matrix(Gene_set1),na.rm = T)
+pca.display$tub[pca.display$tub > 1] <- 1
+pca.display$tub[pca.display$tub < -1] <- -1
+bp2 <-ggscatter(pca.display, color = 'tub' ,x =PCx, y = PCy, size = 5, alpha=0.5) +
+  xlab("") +
+  ylab("") +
+  font("ylab",size=0) +
+  font("xlab",size=0) +
+  font("xy.text", size=0)+
+  rremove("legend") +
+  ggtitle('microtubule-based process') + 
+  scale_color_gradient2(midpoint = .0, low = "blue", mid = "white",
+                          high = "red",name = '')+ theme(plot.title = element_text(size = 20))
+
+
+
+GO_db_set1 <- GO_db %>% filter(GO_term_name == 'regulation of cyclin-dependent protein kinase activity')
+Gene_set1 <- t7_Melanomas %>% filter(rownames(t7_Melanomas) %in% GO_db_set1$Uniprot)
+pca.display$gluc <- colMedians(as.matrix(Gene_set1),na.rm = T)
+pca.display$gluc[pca.display$gluc > 1] <- 1
+pca.display$gluc[pca.display$gluc < -1] <- -1
+bp3 <-ggscatter(pca.display, color = 'gluc' ,x =PCx, y = PCy, size = 5, alpha=0.5) +
+  xlab("") +
+  ylab("") +
+  font("ylab",size=0) +
+  font("xlab",size=0) +
+  font("xy.text", size=0)+
+  rremove("legend") + 
+  ggtitle('cyclin-dependent kinase activity') + 
+  scale_color_gradient2(midpoint = .0, low = "blue", mid = "white",
+                          high = "red",name = '')+ theme(plot.title = element_text(size = 20))
+
+GO_db_set1 <- GO_db %>% filter(GO_term_name == 'ubiquitin ligase complex')
+Gene_set1 <- t7_Melanomas %>% filter(rownames(t7_Melanomas) %in% GO_db_set1$Uniprot)
+pca.display$ccarr <- colMedians(as.matrix(Gene_set1),na.rm = T)
+pca.display$ccarr[pca.display$ccarr > 1] <- 1
+pca.display$ccarr[pca.display$ccarr < -1] <- -1
+bp4 <-ggscatter(pca.display, color = 'ccarr' ,x =PCx, y = PCy, size = 5, alpha=0.5) +
+  xlab("") +
+  ylab("") +
+  font("ylab",size=0) +
+  font("xlab",size=0) +
+  font("xy.text", size=0)+
+  rremove("legend") + 
+  ggtitle('ubiquitin ligase complex') + 
+  scale_color_gradient2(midpoint = .0, low = "blue", mid = "white",
+                          high = "red",name = '') + theme(plot.title = element_text(size = 20))
+
+##plot
+s <- (bp_m + (sp4 | sp3  | sp2 | sp1)/(bp1 | bp2 | bp3 | bp4)) + plot_layout(ncol=2,widths = c(1,2))
+s
+ggsave('/Users/andrewleduc/Desktop/nPOP_Paper/PDFs/SubPOP.pdf',plot = s,height = unit(6, "cm"),width = unit(14, "cm"))
+
+#ggsave('/Users/andrewleduc/Desktop/test_fig3_2.png',plot =(comp_mon | comp_mel),height = unit(5, "cm"),width = unit(20, "cm"))
+```
+
+Differential protein expression betweein Large and small subpopulations
+```{r Diff protein expression}
+
+pvals <- c()
+meds <- c()
+prot <- c()
+for (i in 1:nrow(t7_Melanomas_small)){
+  if(sum(is.na(t7_Melanomas_small[i,])==F) > 9){
+    pvals <- c(pvals,wilcox.test(as.matrix(t7_Melanomas_small[i,]), as.matrix(t7_Melanomas_large[i,]), alternative = "two.sided")$p.value)
+    prot <- c(prot,rownames(t7_Melanomas_small)[i])
+    meds <- c(meds, median(as.matrix(t7_Melanomas_small[i,]),na.rm = T)- median(as.matrix(t7_Melanomas_large[i,]),na.rm = T))
+    
+  }
+  
+}
+
+
+
+
+df <- as.data.frame(pvals)
+df$prot <- prot
+df$FC <- meds
+df$qval <- p.adjust(df$pvals,method = 'BH')
+df <- df %>% filter(qval < .01)
+df$Condition <- NA
+df$Condition[df$FC > 0] <- 'Cluster B'
+df$Condition[df$FC < 0] <- 'Cluster A'
+
+check <- GO_db %>% filter(GO_term_name == 'glycolysis')
+look <- df %>% filter(prot %in% check$Uniprot)
+
+null_dist <- rowMeans(t7_Melanomas_large,na.rm = T)-rowMeans(t7_Melanomas_small,na.rm = T)
+plot_dat <- as.data.frame(null_dist)
+
+colnames(plot_dat) <- 'FC'
+plot_dat$cond <- 'All proteins'
+plot_dat$ap <- 'yes'
+
+t7_Melanomas_large_gly <- t7_Melanomas_large %>% filter(rownames(t7_Melanomas_large)%in% check$Uniprot)
+t7_Melanomas_small_gly <- t7_Melanomas_small %>% filter(rownames(t7_Melanomas_small)%in% check$Uniprot)
+
+Gly_A <- rowMeans(t7_Melanomas_large_gly,na.rm = T)
+Gly_A <- as.data.frame(Gly_A)
+colnames(Gly_A) <- 'FC'
+Gly_A$cond <- ' Cluster A'
+Gly_A$ap <- 'no'
+
+Gly_B <- rowMeans(t7_Melanomas_small_gly,na.rm = T)
+Gly_B <- as.data.frame(Gly_B)
+colnames(Gly_B) <- 'FC'
+Gly_B$cond <- ' Cluster B'
+Gly_B$ap <- 'no'
+
+plot_dat1<- rbind(Gly_A, Gly_B)
+plot_dat1$FC <- plot_dat1$FC-median(null_dist,na.rm = T)
+
+plot_dat$FC <- plot_dat$FC-median(null_dist,na.rm = T)
+
+ncol(Gly_B)
+
+t.test(Gly_B$FC,Gly_A$FC)$p.value
+
+glyco_DDA_plot <- ggplot(plot_dat1,aes(y = FC,x=cond, fill = cond))+geom_boxplot()+theme_bw()+
+  theme(axis.title.x = element_text(size = 30),axis.title.y = element_text(size = 26),
+        axis.text.x = element_text(size = 20),axis.text.y = element_text(size = 20))+
+  ylab(expression(Protein~level~','~log[2],sep = ''))+xlab('') + ylim( c(-1.3,1.3)) + scale_fill_manual(values = c("#dcdcdc", "#808080"))
+
+
+### Glycogen content
+
+
+#Raw Data from Experiment
+Clust_A <- c(564,491,490)- 200
+Clust_B <- c(465,400,406)- 200
+print((Clust_A-70)/254)
+print((Clust_B-70)/254)
+
+Clust_A <-(Clust_A-70)/254
+Clust_B <-(Clust_B-70)/254
+
+df_GLY_Assay <- as.data.frame(Clust_A)
+colnames(df_GLY_Assay)[1]<- 'Gly'
+df_GLY_Assay$samp <- 'Cluster B'
+df_GLY_Assay2 <- as.data.frame(Clust_B)
+colnames(df_GLY_Assay2)[1]<- 'Gly'
+df_GLY_Assay2$samp <- 'Cluster A'
+df_GLY_Assay <- rbind(df_GLY_Assay,df_GLY_Assay2)
+
+t.test(Clust_A,Clust_B)$p.value
+
+Gyly_cont <- ggplot(df_GLY_Assay,aes(x = samp,y = Gly,fill = samp)) + geom_boxplot()+geom_jitter(size = 5) + 
+  theme_bw() +ylab('Glycogen (mg/ml)')+ xlab('')+
+  theme(axis.title.x = element_text(size = 30),axis.title.y = element_text(size = 26),
+  axis.text.x = element_text(size = 20),axis.text.y = element_text(size = 20))+
+  scale_fill_manual(values = c("#dcdcdc", "#808080")) + ylim(c(.4,1.3))
+
+
+Diameter_vs_RI_mel <- ggplot(mel_show,aes(y = log10(Mean.Intensity),x = diameter,color = pop,shape = pop,size = pop)) + geom_point()+scale_size_manual(values =c(2,5))+
+  theme_classic() + coord_cartesian(ylim = c(2,4))+ xlab('Cell diameter') + ylab('')+
+  theme(axis.title.x = element_text(size = 30),axis.title.y = element_text(size = 26),
+        axis.text.x = element_text(size = 20),axis.text.y = element_text(size = 20))+ scale_color_manual(values = c("#dcdcdc", "#808080"))+ylab(expression(Log[10]~mean~RI~signal))
+
+Conc_plot <- ggplot(mel_show, aes(y = log10(conc),x = pop,fill = pop))+ geom_boxplot() + theme_bw()+
+  xlab('') + labs(y=expression(log[10]('Protein conc.')))+theme(axis.title.x = element_text(size = 30),axis.title.y = element_text(size = 26),
+                                                                axis.text.x = element_text(size = 20),axis.text.y = element_text(size = 20))
+
+ggsave('/Users/andrewleduc/Desktop/nPOP_Paper/PDFs/Glyco_assay.pdf',plot = Gyly_cont,height = unit(7, "in"),width = unit(6, "in"),dpi = 1000)
+ggsave('/Users/andrewleduc/Desktop/nPOP_Paper/PDFs/diam_vs_prot_mel.pdf',plot = Diameter_vs_RI_mel,height = unit(7, "in"),width = unit(6, "in"),dpi = 1000)
+ggsave('/Users/andrewleduc/Desktop/nPOP_Paper/PDFs/Conc.pdf',plot = Conc_plot,height = unit(7, "in"),width = unit(6, "in"),dpi = 1000)
+ggsave('/Users/andrewleduc/Desktop/nPOP_Paper/PDFs/Glyco_GO_mel.pdf',plot = glyco_DDA_plot,height = unit(7, "in"),width = unit(6, "in"),dpi = 1000)
+# ggplot(plot_dat1,aes(y = FC,x=cond, fill = cond))+geom_boxplot()+theme_bw()+ ggtitle('Glycolysis')+rremove('legend')+
+#   theme(axis.title.x = element_text(size = 30),axis.title.y = element_text(size = 26),
+#         axis.text.x = element_text(size = 20),axis.text.y = element_text(size = 20),title = element_text(size = 18))+
+#   ylab(expression(Protein~level~','~log[2],sep = ''))+xlab('') + ylim( c(-1.3,1.3)) +
+#   scale_fill_manual(values = c("#dcdcdc", "#808080"))
+
+
+
+```
+
+
