@@ -26,13 +26,13 @@ This application has been tested on R >= 3.5.0, OSX 10.14 / Windows 7/8/10. R ca
 ## Reproducing the data analysis
 
 
-1. Download all the data reports from the "search" section of MassIVE [MSV000089093](https://massive.ucsd.edu/ProteoSAFe/dataset.jsp?task=ae918c7ce5a94a4abd2c6b54a3806c9e).
+1. Download all the data reports from the "search" section of MassIVE [MSV000089159](https://massive.ucsd.edu/ProteoSAFe/dataset.jsp?task=ae918c7ce5a94a4abd2c6b54a3806c9e).
 
-2. Download the two meta files from the "metadata" section of MassIVE (specifically, "[Meta_SingleCell.tsv](https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000089093/updates/2022-03-23_jderks_10a27189/metadata/Meta_SingleCell.tsv&forceDownload=true)" and "[Meta_Bulk_benchmarking.tsv](https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000089093/updates/2022-03-23_jderks_10a27189/metadata/Meta_Bulk_benchmarking.tsv&forceDownload=true)") [MSV000089093](https://massive.ucsd.edu/ProteoSAFe/dataset.jsp?task=ae918c7ce5a94a4abd2c6b54a3806c9e).
+2. Download the metadata file from the Supplemental file 4 of the paper or here at https://docs.google.com/spreadsheets/d/1JtkihjpyDzy3eamB2tLc6-YSjzENClQh/edit?usp=sharing&ouid=105737144695616543623&rtpof=true&sd=true.
 
-3. Create a new R project, and copy the .Rmd, .R, .py, and .txt files from the Code section (https://github.com/SlavovLab/plexDIA) to it. Note: The main functions are in [plexDIA_Functions.R](https://github.com/SlavovLab/plexDIA/blob/main/code/plexDIA_Functions.R), but it uses the other functions in the [code directory](https://github.com/SlavovLab/plexDIA/blob/main/code), so please download all.
+3. Create a new R project, and copy the .Rmd, .R, .py, and .txt files from the Code section (https://github.com/SlavovLab/nPOP) to it. There are several scrips related to preproccessing and full data set PCA (nPOP_Analysis_main.Rmd), cell cycle analysis (CDC.Rmd), melanoma subpopulation analysis (SubPOP.Rmd, and plexDIA/pSCoPE integrated analysis (plexDIA.R).
 
-4. Please update the file paths in the .Rmd.
+4. Please update the file paths in the .Rmd scrips.
 
 5. Run!
 
