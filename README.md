@@ -6,7 +6,7 @@
 
 
 * [nPOP Website](https://scp.slavovlab.net/nPOP) &nbsp; | &nbsp; [Download data](https://scp.slavovlab.net/Leduc_et_al_2022)
-* [Preprint](https://doi.org/10.1101/2021.04.24.441211) <!--  &nbsp; | &nbsp; [*Nature Biotechnology* Article](https://doi.org/10.1038/s41587-022-01389-w) -->
+* [Preprint](https://doi.org/10.1101/2021.04.24.441211)  &nbsp; | &nbsp; [*Genome Biology* Article](https://doi.org/10.1186/s13059-022-02817-5)
 
 
 &nbsp;
@@ -46,7 +46,9 @@ DO-MS is a project...
 
 The manuscript for this tool is published at the Journal of Proteome Research: [https://pubs.acs.org/doi/10.1021/acs.jproteome.9b00039](https://pubs.acs.org/doi/10.1021/acs.jproteome.9b00039)
 -->
-The manuscript is freely available on bioRxiv: [Leduc et al., 2022 (version 4)](https://doi.org/10.1101/2021.04.24.441211). <!-- The peer reviewed version is available at *Nature Biotechnology*: [Derks et al., 2022](https://doi.org/10.1038/s41587-022-01389-w) -->
+The manuscript is freely available on bioRxiv: [Leduc et al., 2022 (version 4)](https://doi.org/10.1101/2021.04.24.441211). The peer reviewed version is available at *Genome Biology*: [Leduc et al., 2022](https://doi.org/10.1186/s13059-022-02817-5)
+
+Leduc, A., Huffman, R.G., Cantlon, J. et al. [Exploring functional protein covariation across single cells using nPOP](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-022-02817-5). *Genome Biol* 23, 261 (2022). https://doi.org/10.1186/s13059-022-02817-5
 
 For more information, contact [Slavov Laboratory](https://slavovlab.net).
 
